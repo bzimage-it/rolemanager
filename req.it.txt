@@ -1,0 +1,117 @@
+
+
+il software è costituito da una libreria PHP rolemanager.php che accede ad alcune tabelle di un DB MYSQL per fornire API per la gestione generica 
+del role management
+
+deve essere prodoto anche rolemanager-create.sql che contiene la ricreazione delle tabelle usate dal software.
+
+le entità in gioco sono:
+
+- (user) utenti: identificati da login(chiave),password,email
+  opzionali: nome,cognome
+- (group) gruppi: un insieme di utenti (eventualmente vuoto) e un insieme di gruppi (eventualmente vuoto)
+- (rightgroup): raggruppa i diritti in famiglie.
+- (righttype-range): definisce i tipi di diritti "range" disponibili (una scala di valori da un minimo a un massimo).
+- (diritto) che gli utenti possono svolgere; 
+   Ogni diritto appartiene a una "rightgroup", che è una attributo che li raggruppa in famiglie. 
+   Ogni diritto ha un tipo che può essere:
+   - boolean (vero/falso)
+   - scala intera (righttype-range) uno dei tipi definiti sopra.
+- (role) un ruolo è un opportua lista di diritti abilitanti, ovvero:
+   - una lista di diritti booleani (sono intesi "veri" quelli presenti, "falsi" quelli non presenti nella lista)
+   - una lista di diritti righttype-range ciascuno con un valore specifico interno fra i valori ammessi di quel tipo 
+- (role context o semplicemente context) è l'entità che lega il tutto: attribuisce ruoli a utenti e gruppi di utenti.
+   Un ruolo può essere assegnato in un contesto specifico o in un "Contesto Globale". Un'assegnazione globale (identificata da un `context_id` nullo) è valida in tutti i contesti, ma ha una precedenza inferiore rispetto a un'assegnazione fatta in un contesto specifico.
+
+== PRECEDENZA DEI DIRITTI ==
+
+Poiché un utente può ricevere lo stesso diritto da più fonti (direttamente, da gruppi, in contesti specifici o globali), viene definita una regola di precedenza gerarchica per risolvere i conflitti:
+
+1.  **Specificità del Contesto:** Un diritto assegnato in un contesto specifico ha sempre la precedenza su un diritto assegnato nel Contesto Globale.
+2.  **Specificità dell'Assegnatario:** A parità di contesto, un diritto assegnato direttamente a un utente ha la precedenza su un diritto ereditato da un gruppo.
+3.  **Specificità del Gruppo:** Se un utente eredita lo stesso diritto da più gruppi annidati, vince il diritto proveniente dal gruppo più "vicino" all'utente nella gerarchia.
+4.  **Risoluzione Pareggi:** In caso di pareggio perfetto di specificità (es. utente membro di due gruppi allo stesso livello), per i diritti di tipo `range` vince il valore più alto.
+
+== DIAGNOSTICA E TRASPARENZA ==
+
+Per rendere il sistema di permessi trasparente e facile da debuggare, la libreria deve fornire un'API di "spiegazione".
+
+- **Metodo `explainRight()`:** Oltre alla normale funzione di verifica dei permessi, verrà implementato un metodo `explainRight()`.
+- **Scopo:** Questo metodo non si limita a restituire il risultato finale, ma ricostruisce e restituisce l'intera catena di decisioni che ha portato a quel risultato. È pensato per interfacce di amministrazione e debugging.
+- **Output:** La funzione restituirà una struttura dati dettagliata che include la decisione finale, la regola vincente e un tracciamento completo di tutte le regole considerate (applicate e ignorate) con la loro origine (utente/gruppo), ruolo e contesto.
+
+== REQUSITI SULLE ENTITA ==
+
+Tutte le entità (tranne user) hanno sempre un nome (chiave) e una descizione (textarea).
+
+Tutte le entità nel DB sono rappresentate con un ID interno numerico primary key incrementale e un nome o chiave univica sopra indicata 
+che però non è la chiave primaria, dimodoche è possibile cambiare la chiave senza ristrutturare tutte i riferimenti nelle altre tabelle.
+
+I ruoli sono in pratica "istanze" dei diritti in quanto declinano un certo numero di diritti dei tre tipi supportati.
+
+== LOG ==
+
+il programma deve contemplare una classe per eseguire logging fatto sia su console sia su una opportuna tabella del DB.
+non viene fatto uso di librerie esterne per fare i logging.
+per ciascun canale di log deve essere gestibile un loglevel (debug,info,notice,warning,error,critical,alert,fatal)
+ciascua invoazione di logging deve includere, oltree ai soliti parametri in questi casi, un flag che dice se il messaggio 
+va o no indirizzato verso il DB.
+
+== GRUPPI ==
+
+particolare attenzione va posta alle API dei gruppi in particolare essendo che gruppi possono essere inclusi in altri gruppi vanno 
+verificate le relazioni di circolarità evitandole prima che vengano memorizzate.
+
+La circolarità dei gruppi viene verificata risolvendo per un dato gruppo quali sono i gruppi che esso contiene. 
+Per ognuno di essi si procede allo stesso modo costruendo così un albero a partire dal gruppo di partenza. 
+Non appena si crea un "loop" su questo albero, l'algoritmo rivela la circolarità. Questo può essere fatto con l'uso di uno stack
+visitando l'albero in profondità: se il nodo che stiamo visitando è già presente nello stack, allora c'è un loop.
+
+Gli utenti totali di un gruppo sono la somma degli utenti in esso definiti uniti, ricorsivamente, con gli utenti dei 
+gruppi che ne fanno parte.
+
+== API ==
+
+Le API sono costituite da classi e chiamate a metodi quindi si tratta di una libreria usata da altri programmi PHP.
+
+le API fornide devono prevedere operazioni CRUD per ognuna delle entità coinvolte ponendo attenzione a non rompere 
+i vincoli fra le entità in gioco (ad esempio non si può cancellare un diritto se questo è usato in qualche ruolo).
+
+Le informazioni di connessione al DB sono gestite esternamente (l'oggetto "connect" al db viene passato alle classi ad 
+esempio nel costruttore)
+
+== AUTENTICAZIONE ==
+
+La libreria fornisce API per l'autenticazione, seguendo il Principio di Singola Responsabilità.
+
+- **Verifica delle Credenziali:** Il metodo `authenticate(login, password)` ha il solo scopo di verificare se le credenziali fornite sono corrette.
+- **Nessuna Gestione di Sessione:** La libreria non crea, gestisce o invalida token di sessione (es. JWT) né gestisce cookie. Questa responsabilità è lasciata interamente all'applicazione che la utilizza.
+- **Restituzione dei Dati Utente:** In caso di successo, il metodo `authenticate` non restituisce un semplice booleano, ma un array contenente i dati essenziali dell'utente (ID, login, email, etc.).
+- **Scopo dell'Output:** Questo array è pensato per essere usato dall'applicazione chiamante come *payload* per creare un token JWT o per inizializzare una sessione stateful, garantendo la massima flessibilità.
+
+== ALTRI REQUISITI ==
+
+tutte le tabelle coinvolte devono avere come prefisso "role_manager_"
+tutto il software sia la nomenclatura degli identificatori che i commenti devono essere in inglese anche se le conversazioni 
+e questi requisiti sono in lingua italiana.
+
+
+== PERFORMANCE E CACHING ==
+
+Le operazioni di verifica dei permessi (es. `hasRight`) sono le più frequenti e critiche per le performance dell'intera libreria. Interrogare il database ad ogni singola chiamata è insostenibile in un'applicazione reale.
+Per ottimizzare queste operazioni, verrà implementato un sistema di caching a più livelli basato su un meccanismo di invalidazione centralizzato.
+
+1.  **Caching a più livelli:**
+    *   **Cache a livello di richiesta (In-Memory):** I permessi completi di un utente per un dato contesto vengono calcolati dal database una sola volta per ogni esecuzione dello script PHP. Le chiamate successive alla verifica dei permessi all'interno della stessa richiesta utilizzeranno i dati già caricati in memoria, azzerando il costo delle interrogazioni successive.
+    *   **Cache persistente tra le richieste:** I permessi calcolati vengono memorizzati in una cache veloce e persistente (es. APCu, Redis, Memcached, a seconda della configurazione dell'ambiente) per evitare di interrogare il DB a ogni nuova richiesta HTTP.
+
+2.  **Invalidazione della cache tramite "Version Token" globale:**
+    *   **Contatore di Versione:** Verrà introdotta una tabella di configurazione (`role_manager_config`) per memorizzare un contatore di versione globale dei permessi (es. una chiave `permissions_version` con un valore intero).
+    *   **Incremento alla Modifica:** Qualsiasi operazione CRUD che possa alterare la struttura dei permessi di qualsiasi utente (es. modifica di un ruolo, assegnazione di un utente a un gruppo, modifica dei diritti di un ruolo, etc.) deve atomicamente incrementare questo contatore globale.
+    *   **Validazione della Cache:** Al momento della verifica di un permesso, il sistema:
+        a. Legge la versione corrente del contatore globale.
+        b. Prova a leggere i permessi dalla cache persistente.
+        c. Se i dati in cache esistono e la loro versione salvata corrisponde alla versione globale attuale, la cache è valida e viene usata.
+        d. Se la cache non esiste o la sua versione è obsoleta, i permessi vengono ricalcolati dal DB e la cache persistente viene aggiornata con i nuovi dati e la nuova versione.
+
+Questo approccio garantisce massime performance per le letture (che sono la maggioranza delle operazioni) e mantiene un meccanismo di invalidazione semplice, robusto e centralizzato, riducendo la complessità e il rischio di errori.

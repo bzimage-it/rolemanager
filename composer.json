@@ -1,0 +1,16 @@
+{
+    "require-dev": {
+        "phpunit/phpunit": "^10.5"
+    },
+    "autoload": {
+        "psr-4": {
+            "RoleManager\\": "src/"
+        }
+    },
+    "autoload-dev": {
+        "psr-4": {
+            "RoleManager\\Tests\\Unit\\": "tests/Unit/",
+            "RoleManager\\Tests\\Integration\\": "tests/Integration/"
+        }
+    }
+}

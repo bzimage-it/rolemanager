@@ -1,0 +1,13 @@
+# Dependencies managed by Composer
+/vendor/
+
+# It's a library, so we don't commit the lock file.
+# This allows the final application to resolve its own dependencies.
+composer.lock
+
+# PHPUnit cache and reports
+/.phpunit.cache/
+/coverage-report/
+
+# OS-generated files
+.DS_Store

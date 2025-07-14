@@ -1,0 +1,99 @@
+The software consists of a PHP library, rolemanager.php, that accesses several tables in a MySQL DB to provide a generic API for role management.
+
+A `rolemanager-create.sql` file must also be produced, containing the script to create the tables used by the software.
+
+The entities involved are:
+
+- (user) users: identified by login (key), password, email. Optional: first name, last name.
+- (group) groups: a set of users (possibly empty) and a set of groups (possibly empty).
+- (rightgroup): groups rights into families.
+- (righttype-range): defines the available "range" right types (a scale of values from a minimum to a maximum).
+- (right) that users can perform; Each right belongs to a "rightgroup", which is an attribute that groups them into families. Each right has a type that can be:
+   - boolean (true/false)
+   - integer scale (righttype-range) one of the types defined above.
+- (role) a role is an appropriate list of enabling rights, namely:
+   - a list of boolean rights (those present are considered "true", those not present are "false")
+   - a list of righttype-range rights, each with a specific internal value within the allowed values for that type.
+- (role context or simply context) is the entity that ties everything together: it assigns roles to users and user groups.
+   A role can be assigned in a specific context or in a "Global Context". A global assignment (identified by a null `context_id`) is valid in all contexts but has lower precedence than an assignment made in a specific context.
+
+== PERMISSION PRECEDENCE ==
+
+Since a user can receive the same right from multiple sources (directly, from groups, in specific or global contexts), a hierarchical precedence rule is defined to resolve conflicts:
+
+1.  **Context Specificity:** A right assigned in a specific context always takes precedence over a right assigned in the Global Context.
+2.  **Assignee Specificity:** Within the same context, a right assigned directly to a user takes precedence over a right inherited from a group.
+3.  **Group Specificity:** If a user inherits the same right from multiple nested groups, the right from the group "closest" to the user in the hierarchy wins.
+4.  **Tie-Breaking:** In case of a perfect tie in specificity (e.g., a user is a member of two groups at the same level), for `range` type rights, the highest value wins.
+
+== DIAGNOSTICS AND TRANSPARENCY ==
+
+To make the permission system transparent and easy to debug, the library must provide an "explanation" API.
+
+- **`explainRight()` Method:** In addition to the normal permission check function, an `explainRight()` method will be implemented.
+- **Purpose:** This method does not just return the final result, but reconstructs and returns the entire decision chain that led to that result. It is intended for administration and debugging interfaces.
+- **Output:** The function will return a detailed data structure that includes the final decision, the winning rule, and a complete trace of all considered rules (applied and ignored) with their origin (user/group), role, and context.
+
+== ENTITY REQUIREMENTS ==
+
+All entities (except user) always have a name (key) and a description (textarea).
+
+All entities in the DB are represented with an internal numeric auto-incrementing primary key ID and a unique name or key as indicated above, which is not the primary key, so that it is possible to change the key without restructuring all references in other tables.
+
+Roles are, in practice, "instances" of rights as they define a certain number of rights of the three supported types.
+
+== LOGGING ==
+
+The program must include a class to perform logging both to the console and to an appropriate DB table.
+No external libraries are used for logging.
+A log level (debug, info, notice, warning, error, critical, alert, fatal) must be manageable for each log channel.
+Each logging invocation must include, in addition to the usual parameters in these cases, a flag that indicates whether or not the message should be directed to the DB.
+
+== GROUPS ==
+
+Particular attention must be paid to the group APIs, especially since groups can be included in other groups, circular relationships must be checked and avoided before they are stored.
+
+The circularity of groups is verified by resolving for a given group which groups it contains. For each of them, the same procedure is followed, thus building a tree starting from the initial group. As soon as a "loop" is created in this tree, the algorithm detects the circularity. This can be done using a stack by visiting the tree in depth: if the node we are visiting is already on the stack, then there is a loop.
+
+The total users of a group are the sum of the users defined in it, merged recursively with the users of the groups that are part of it.
+
+== API ==
+
+The API consists of classes and method calls, so it is a library to be used by other PHP programs.
+
+The provided APIs must include CRUD operations for each of the involved entities, paying attention not to break the constraints between the entities (for example, a right cannot be deleted if it is used in any role).
+
+The DB connection information is managed externally (the DB "connect" object is passed to the classes, for example, in the constructor).
+
+== AUTHENTICATION ==
+
+The library provides an API for authentication, following the Single Responsibility Principle.
+
+- **Credential Verification:** The `authenticate(login, password)` method's sole purpose is to verify if the provided credentials are correct.
+- **No Session Management:** The library does not create, manage, or invalidate session tokens (e.g., JWT) nor does it handle cookies. This responsibility is left entirely to the application using it.
+- **User Data Return:** On success, the `authenticate` method does not return a simple boolean, but an array containing the user's essential data (ID, login, email, etc.).
+- **Output Purpose:** This array is intended to be used by the calling application as a *payload* to create a JWT token or to initialize a stateful session, ensuring maximum flexibility.
+
+== OTHER REQUIREMENTS ==
+
+All involved tables must have the prefix "role_manager_".
+All software, including identifier naming and comments, must be in English, even though the conversations and these requirements are in Italian.
+
+== PERFORMANCE AND CACHING ==
+
+Permission check operations (e.g., `hasRight`) are the most frequent and critical for the performance of the entire library. Querying the database on every single call is unsustainable in a real application. To optimize these operations, a multi-level caching system based on a centralized invalidation mechanism will be implemented.
+
+1.  **Multi-level Caching:**
+    *   **Request-level Cache (In-Memory):** A user's complete permissions for a given context are calculated from the database only once per PHP script execution. Subsequent permission check calls within the same request will use the data already loaded in memory, eliminating the cost of subsequent queries.
+    *   **Persistent Cache Across Requests:** Calculated permissions are stored in a fast, persistent cache (e.g., APCu, Redis, Memcached, depending on the environment's configuration) to avoid querying the DB on every new HTTP request.
+
+2.  **Cache Invalidation via Global "Version Token":**
+    *   **Version Counter:** A configuration table (`role_manager_config`) will be introduced to store a global permission version counter (e.g., a `permissions_version` key with an integer value).
+    *   **Increment on Modification:** Any CRUD operation that can alter the permission structure of any user (e.g., modifying a role, assigning a user to a group, changing a role's rights, etc.) must atomically increment this global counter.
+    *   **Cache Validation:** When checking a permission, the system:
+        a. Reads the current version of the global counter.
+        b. Tries to read the permissions from the persistent cache.
+        c. If the cached data exists and its saved version matches the current global version, the cache is valid and is used.
+        d. If the cache does not exist or its version is outdated, the permissions are recalculated from the DB, and the persistent cache is updated with the new data and the new version.
+
+This approach ensures maximum performance for reads (which are the majority of operations) and maintains a simple, robust, and centralized invalidation mechanism, reducing complexity and the risk of errors.
