@@ -178,3 +178,31 @@ Array
 )
 */
 ```
+
+---
+
+## Testing
+
+The library comes with a full suite of unit and integration tests using PHPUnit. A helper script is provided to simplify execution.
+
+### 1. Install Dependencies
+
+Ensure you have installed the development dependencies:
+
+```bash
+composer install
+```
+
+### 2. Run Tests
+
+Use the `run-tests.sh` script (remember to make it executable with `chmod +x run-tests.sh`):
+
+```bash
+# Run the full test suite
+./run-tests.sh
+
+# Run tests and generate an HTML code coverage report
+./run-tests.sh --coverage
+```
+
+The coverage report will be created in the `coverage-report/` directory.
