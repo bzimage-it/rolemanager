@@ -206,3 +206,10 @@ Use the `run-tests.sh` script (remember to make it executable with `chmod +x run
 ```
 
 The coverage report will be created in the `coverage-report/` directory.
+
+### 3. TODO
+
+* more unit tests
+* complete coverage 
+* more integration tests
+

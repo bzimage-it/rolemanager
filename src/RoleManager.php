@@ -12,6 +12,12 @@ use Exception;
  * classes that handle specific entities like users, groups, roles, etc.
  */
 class RoleManager {
+    /**
+     * The current version of the RoleManager library.
+     * Follows Semantic Versioning (https://semver.org).
+     */
+    public const VERSION = '0.1.0';
+
     /** @var PDO */
     private $db;
 
