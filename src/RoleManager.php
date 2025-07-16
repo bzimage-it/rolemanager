@@ -16,7 +16,7 @@ class RoleManager {
      * The current version of the RoleManager library.
      * Follows Semantic Versioning (https://semver.org).
      */
-    public const VERSION = '0.1.0';
+    public const VERSION = '0.1.1';
 
     /** @var PDO */
     private $db;

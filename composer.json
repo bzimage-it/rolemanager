@@ -1,6 +1,6 @@
 {
     "name": "sebastiani/rolemanager",
-    "version": "0.1.0",
+    "version": "0.1.1",
     "description": "A comprehensive PHP library for managing users, groups, roles, and permissions.",
     "type": "library",
     "license": "MIT",
