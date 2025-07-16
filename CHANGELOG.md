@@ -1,3 +1,72 @@
+## [Unreleased]
+
+### Added
+
+### Changed
+
+### Deprecated
+
+### Removed
+
+### Fixed
+
+### Security
+
+## [0.1.0] - 2025-07-16
+
+### Added
+
+### Changed
+
+### Deprecated
+
+### Removed
+
+### Fixed
+
+### Security
+
+
+### Added
+
+### Changed
+
+### Deprecated
+
+### Removed
+
+### Fixed
+
+### Security
+
+## [Unreleased]
+
+### Added
+
+### Changed
+
+### Deprecated
+
+### Removed
+
+### Fixed
+
+### Security
+
+## [0.1.0] - 2025-07-16
+
+### Added
+
+### Changed
+
+### Deprecated
+
+### Removed
+
+### Fixed
+
+### Security
+
 # Changelog
 
 All notable changes to this project will be documented in this file.
@@ -19,7 +88,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Security
 
-## [0.1.0] - 2025-07-15
+## [0.1.0] - 2025-07-15 
 
 ### Added
 - Initial release of the RoleManager library.
@@ -28,5 +97,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Diagnostic tool `explainRight()` for permission transparency.
 - Caching system for authentication checks.
 
+
+[0.1.0]: https://github.com/sebastiani/rolemanager/compare/v0.1.1...v0.1.0
+
+
 [Unreleased]: https://github.com/sebastiani/rolemanager/compare/v0.1.0...HEAD
-[0.1.0]: https://github.com/sebastiani/rolemanager/releases/tag/v0.1.0
+[0.1.0]: https://github.com/sebastiani/rolemanager/compare/v0.1.0...v0.1.0
+[0.1.0]: https://github.com/sebastiani/rolemanager/compare/v0.1.1...v0.1.0
