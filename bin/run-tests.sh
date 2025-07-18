@@ -15,9 +15,12 @@
 set -e # Exit immediately if a command exits with a non-zero status.
 
 # --- Configuration ---
-ROOT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )"
+# Determine the project root directory, assuming this script is in project_root/bin/
+# This allows running the script from any location.
+ROOT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )/.." &> /dev/null && pwd )"
 PHPUNIT_BIN="$ROOT_DIR/vendor/bin/phpunit"
 COVERAGE_DIR="$ROOT_DIR/coverage-report"
+TESTS_DIR="$ROOT_DIR/tests"
 
 # --- Pre-flight Checks ---
 if [ ! -f "$PHPUNIT_BIN" ]; then
@@ -26,29 +29,43 @@ if [ ! -f "$PHPUNIT_BIN" ]; then
     exit 1
 fi
 
-# --- Argument Parsing ---
-PHPUNIT_ARGS=""
-COVERAGE_ENABLED=false
+if [ ! -d "$TESTS_DIR" ]; then
+    echo "   Error: Test directory not found at $TESTS_DIR."
+    echo "   Please make sure your tests are in a 'tests/' directory in the project root."
+    exit 1
+fi
 
-for arg in "$@"
-do
-    case $arg in
+# --- Argument Parsing ---
+COVERAGE_ENABLED=false
+PHPUNIT_PASSTHRU_ARGS=()
+
+while (( "$#" )); do
+    case "$1" in
         --coverage)
-        COVERAGE_ENABLED=true
-        PHPUNIT_ARGS="$PHPUNIT_ARGS --coverage-html $COVERAGE_DIR"
-        shift
-        ;;
+            COVERAGE_ENABLED=true
+            shift
+            ;;
+        *) # Collect any other arguments to pass to PHPUnit
+            PHPUNIT_PASSTHRU_ARGS+=("$1")
+            shift
+            ;;
     esac
 done
 
 # --- Execution ---
 echo "🚀 Running RoleManager Test Suite..."
 
-if [ "$COVERAGE_ENABLED" = true ] ; then
-    echo "   (Code coverage enabled)"
+# If specific files/filters were passed, use them. Otherwise, default to the main tests directory.
+if [ ${#PHPUNIT_PASSTHRU_ARGS[@]} -eq 0 ]; then
+    PHPUNIT_PASSTHRU_ARGS=("$TESTS_DIR")
 fi
 
-eval "$PHPUNIT_BIN $PHPUNIT_ARGS"
+if [ "$COVERAGE_ENABLED" = true ] ; then
+    echo "   (Code coverage enabled, will be generated in $COVERAGE_DIR)"
+    eval "$PHPUNIT_BIN --coverage-html $COVERAGE_DIR \"${PHPUNIT_PASSTHRU_ARGS[@]}\""
+else
+    eval "$PHPUNIT_BIN \"${PHPUNIT_PASSTHRU_ARGS[@]}\""
+fi
 
 echo ""
 echo "Tests completed successfully."

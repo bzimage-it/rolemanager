@@ -19,7 +19,17 @@ CHANGELOG="CHANGELOG.md"
 # --- Helper Functions ---
 
 function get_current_version() {
-    php -r 'echo json_decode(file_get_contents("composer.json"), true)["version"];'
+  # Use jq to extract the version from composer.json.
+  # This is more robust and avoids potential quoting issues.
+  local version
+  version=$(jq -r .version "$COMPOSER_JSON")
+
+  if [ -z "$version" ] || [ "$version" = "null" ]; then
+    echo "Error: Could not extract version from composer.json using jq." >&2
+    exit 1
+  fi
+
+  echo "$version"
 }
 
 function update_json_version() {
@@ -98,12 +108,26 @@ function update_changelog() {
 
 # --- Main Script ---
 
-# Go to the project's root directory
-cd "$(dirname "$0")/.."
+# Go to the project's root directory (where composer.json is located).
+# This allows the script to be run from any location and handles cases where
+# the script might be in the root or in a subdirectory like 'bin/'.
+SCRIPT_DIR=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" &>/dev/null && pwd)
+cd "$SCRIPT_DIR"
+
+# If composer.json is not here, we are likely in a subdir. Go up.
+if [ ! -f "composer.json" ]; then
+    cd ..
+fi
+
+# Final check to ensure we are in the correct directory
+if [ ! -f "composer.json" ]; then
+    echo "Error: Could not find project root (composer.json)." >&2
+    exit 1
+fi
 
 if [ -z "$1" ]; then
-    echo "Error: Please specify a version (e.g., 1.0.1) or an increment type (patch, minor, major)."
-    echo "Usage: $0 <new_version | patch | minor | major>"
+    echo "Error: Please specify a full version string (e.g., 1.0.1) or an increment type (patch, minor, major)."
+    echo "Usage: $0 <new_version> | patch | minor | major"
     exit 1
 fi
 

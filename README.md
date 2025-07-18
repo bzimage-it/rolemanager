@@ -195,14 +195,14 @@ composer install
 
 ### 2. Run Tests
 
-Use the `run-tests.sh` script (remember to make it executable with `chmod +x run-tests.sh`):
+Use the `run-tests.sh` script from the `bin` directory (remember to make it executable with `chmod +x bin/run-tests.sh`):
 
 ```bash
 # Run the full test suite
-./run-tests.sh
+./bin/run-tests.sh
 
 # Run tests and generate an HTML code coverage report
-./run-tests.sh --coverage
+./bin/run-tests.sh --coverage
 ```
 
 The coverage report will be created in the `coverage-report/` directory.
@@ -212,4 +212,3 @@ The coverage report will be created in the `coverage-report/` directory.
 * more unit tests
 * complete coverage 
 * more integration tests
-
